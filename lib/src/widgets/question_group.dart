@@ -12,10 +12,11 @@ class GroupWidget extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(group.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ...group.questions.map((question) {
-          return QuestionWidget(question: question);
-        }),
+        // Text(
+        //   group.description,
+        //   style: const TextStyle(fontWeight: FontWeight.bold),
+        // ),
+        ...group.questions.map((question) => QuestionWidget(question: question)),
       ],
     );
   }

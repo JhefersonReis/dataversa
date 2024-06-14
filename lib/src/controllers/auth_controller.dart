@@ -1,4 +1,8 @@
+import 'dart:developer';
+
 import 'package:dataversa/src/controllers/connection_controller.dart';
+import 'package:dataversa/src/database/database.dart';
+import 'package:dataversa/src/helpers/helpers.dart';
 import 'package:dataversa/src/models/session_key_model.dart';
 import 'package:dataversa/src/repositories/auth_repository.dart';
 import 'package:get_it/get_it.dart';
@@ -12,6 +16,9 @@ class AuthController {
   final logged = signal(false);
   final _loading = signal(false);
   final connection = GetIt.I<ConnectionController>();
+  final database = GetIt.I<Database>();
+
+  Helpers get helper => Helpers();
 
   bool get loading => _loading.value;
 
@@ -20,26 +27,49 @@ class AuthController {
 
     await connection.checkConnection();
     if (!connection.isConnected) {
-      throw Exception('Sem conexão com a internet');
+      helper.showToastMessage(
+        message: 'Sem conexão com a internet!',
+        isError: true,
+      );
+      _loading.set(false);
+      return;
     }
 
     try {
       final response = await authRepository.login(user, password);
 
-      final isar = Isar.getInstance();
-      await isar!.writeTxn(() => isar.sessionKeys.put(SessionKey(sessionKey: response)));
+      await database.isar.writeTxn(() async {
+        await database.isar.sessionKeys.clear();
+        await database.isar.sessionKeys.put(
+          SessionKey(sessionKey: response, user: user, password: password),
+        );
+      });
       logged.set(true);
-      // log(response.toString());
     } catch (e) {
-      rethrow;
+      helper.showErrorMessage(e.toString());
     } finally {
       _loading.set(false);
     }
   }
 
+  Future<void> simulateLogin() async {
+    _loading.set(true);
+
+    Future.delayed(const Duration(seconds: 2), () {
+      // logged.set(true);
+      _loading.set(false);
+    });
+  }
+
+  Future<void> refreshSessionKey() async {
+    final session = await database.isar.sessionKeys.where().findFirst();
+
+    await login(session!.user, session.password);
+    // await database.isar.writeTxn(() => database.isar.sessionKeys.delete(session.id));
+  }
+
   void logout() async {
-    final isar = Isar.getInstance();
     logged.set(false);
-    await isar!.writeTxn(() => isar.clear());
+    await database.isar.writeTxn(() => database.isar.clear());
   }
 }

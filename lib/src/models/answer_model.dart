@@ -8,7 +8,7 @@ class Answer {
   int responseId;
   int questionId;
   String value;
-  String other;
+  String? other;
 
   factory Answer.fromMap(Map<String, dynamic> map) {
     return Answer(
@@ -25,6 +25,6 @@ class Answer {
     required this.responseId,
     required this.questionId,
     required this.value,
-    required this.other,
+    this.other,
   });
 }

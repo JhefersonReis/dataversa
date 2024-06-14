@@ -32,7 +32,22 @@ class _PhotoQuestionWidgetState extends State<PhotoQuestionWidget> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(widget.question.question, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Row(
+          children: [
+            Text(
+              widget.question.question,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            if (widget.question.mandatory)
+              const Text(
+                ' Obrigatório*',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 12,
+                ),
+              ),
+          ],
+        ),
         ElevatedButton(
           onPressed: () => _navigateAndCapturePhoto(context),
           child: const Text('Take a photo'),

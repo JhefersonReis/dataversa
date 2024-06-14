@@ -1,7 +1,13 @@
+import 'dart:async';
+import 'dart:developer';
+
 import 'package:dataversa/src/controllers/form_controller.dart';
+import 'package:dataversa/src/helpers/helpers.dart';
 import 'package:dataversa/src/widgets/question_group.dart';
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
+import 'package:go_router/go_router.dart';
+import 'package:signals/signals_flutter.dart';
 
 class FormWidget extends StatefulWidget {
   final FormStructure formStructure;
@@ -15,12 +21,23 @@ class FormWidget extends StatefulWidget {
 
 class _FormWidgetState extends State<FormWidget> {
   final formController = GetIt.I.get<FormController>();
+  final PageController _pageController = PageController();
+  final _currentPage = signal(0);
   bool _isLoading = true;
+
+  Helpers helpers = Helpers();
 
   @override
   void initState() {
     super.initState();
     _loadFormData();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+    _pageController.dispose();
+    _currentPage.dispose();
   }
 
   Future<void> _loadFormData() async {
@@ -33,7 +50,29 @@ class _FormWidgetState extends State<FormWidget> {
     });
   }
 
-  // @override
+  void _saveForm() async {
+    final completer = Completer<bool>();
+    formController.saveAnswers(widget.formStructure, widget.responseId, completer);
+
+    final result = await completer.future;
+    if (result) {
+      helpers.showToastMessage(message: 'Answers saved successfully!', isSuccess: true);
+      if (mounted) {
+        context.pop();
+      }
+    }
+  }
+
+  void _nextPage() {
+    if (_currentPage.value < widget.formStructure.form.length - 1) {
+      _pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn);
+    }
+  }
+
+  bool get _isLastPage {
+    return _currentPage.value == widget.formStructure.form.length - 1;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -44,29 +83,68 @@ class _FormWidgetState extends State<FormWidget> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.formStructure.title),
+        backgroundColor: Colors.white,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('ID: ${widget.responseId} - '),
+            Text(widget.formStructure.title),
+          ],
+        ),
       ),
-      body: ListView.builder(
+      body: PageView.builder(
+        controller: _pageController,
         itemCount: widget.formStructure.form.length,
+        onPageChanged: (index) {
+          _currentPage.value = index;
+        },
         itemBuilder: (context, index) {
           final group = widget.formStructure.form[index];
-          return GroupWidget(group: group);
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            child: GroupWidget(group: group),
+          );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          // Save the form
-          await formController.saveAnswers(widget.formStructure, widget.responseId);
-          // ScaffoldMessenger.of(context).showSnackBar(
-          //   const SnackBar(
-          //     content: Text('Answers saved successfully!'),
-          //   ),
-          // );
-        },
-        tooltip: 'Salvar',
-        label: const Text('Salvar'),
-        icon: const Icon(Icons.save),
+      floatingActionButton: Watch(
+        (context) => FloatingActionButton.extended(
+          onPressed: _isLastPage ? _saveForm : _nextPage,
+          tooltip: _isLastPage ? 'Salvar' : 'Próximo',
+          label: Text(_isLastPage ? 'Salvar' : 'Próximo'),
+          icon: Icon(_isLastPage ? Icons.save : Icons.arrow_forward),
+        ),
       ),
     );
+  }
+}
+
+class PageState extends InheritedWidget {
+  final PageController pageController;
+  final ValueNotifier<int> currentPage;
+
+  const PageState({
+    super.key,
+    required this.pageController,
+    required this.currentPage,
+    required super.child,
+  });
+
+  static PageState of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<PageState>()!;
+  }
+
+  @override
+  bool updateShouldNotify(PageState oldWidget) {
+    return currentPage != oldWidget.currentPage;
+  }
+
+  void nextPage() {
+    if (currentPage.value < pageController.positions.length - 1) {
+      pageController.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeIn);
+    }
+  }
+
+  bool isLastPage() {
+    return currentPage.value == pageController.positions.length - 1;
   }
 }

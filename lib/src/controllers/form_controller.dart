@@ -1,27 +1,34 @@
+import 'dart:async';
 import 'dart:convert';
 
+import 'package:dataversa/src/database/database.dart';
+import 'package:dataversa/src/helpers/helpers.dart';
 import 'package:dataversa/src/models/answer_model.dart';
 import 'package:dataversa/src/models/question_model.dart';
 import 'package:dataversa/src/models/question_properties_model.dart';
+import 'package:dataversa/src/models/response_model.dart';
 import 'package:dataversa/src/models/survey_model.dart';
 import 'package:flutter/material.dart';
+import 'package:get_it/get_it.dart';
 import 'package:isar/isar.dart';
 
 class FormController {
-  Future<FormStructure> getSurveyForm(int sid) async {
-    final isar = Isar.getInstance();
+  final database = GetIt.I<Database>();
 
+  Helpers helpers = Helpers();
+
+  Future<FormStructure> getSurveyForm(int sid) async {
     // Fetch survey details
-    final survey = await isar!.surveys.filter().sidEqualTo(sid).findFirst();
+    final survey = await database.isar.surveys.filter().sidEqualTo(sid).findFirst();
 
     if (survey == null) {
       throw Exception('Survey not found');
     }
 
     // Fetch all questions related to the survey
-    final questions = await isar.questions.filter().sidEqualTo(sid).sortByQuestionOrder().findAll();
+    final questions = await database.isar.questions.filter().sidEqualTo(sid).sortByQuestionOrder().findAll();
 
-    final questionProperties = await isar.questionProperties.filter().sidEqualTo(sid).findAll();
+    final questionProperties = await database.isar.questionProperties.filter().sidEqualTo(sid).findAll();
 
     // Organize questions by groups
     final Map<int, FormGroup> groupsMap = {};
@@ -50,6 +57,7 @@ class FormController {
         type: question.type,
         themeName: question.questionThemeName,
         mandatory: question.mandatory == 'Y',
+        other: question.other,
         order: question.questionOrder,
         maxNumOfFiles: null,
         subQuestions: [],
@@ -113,20 +121,38 @@ class FormController {
     );
   }
 
-  Future<void> saveAnswers(FormStructure formStructure, int responseId) async {
-    final isar = Isar.getInstance();
-
+  Future<void> saveAnswers(FormStructure formStructure, int responseId, Completer<bool> completer) async {
     final answersToSave = <Answer>[];
     final answersToUpdate = <Answer>[];
+    final answersToDelete = <Answer>[];
+
+    for (final group in formStructure.form) {
+      for (final question in group.questions) {
+        if (!question.validate()) {
+          helpers.showToastMessage(message: 'Por favor, preencha todas as perguntas obrigatórias.', isError: true);
+          completer.complete(false);
+          return;
+        }
+      }
+    }
 
     for (final group in formStructure.form) {
       for (final question in group.questions) {
         // Coletar a resposta com base no tipo de questão
+        final existingAnswers = await database.isar.answers
+            .filter()
+            .responseIdEqualTo(responseId)
+            .and()
+            .questionIdEqualTo(question.questionId)
+            .findAll();
+
+        answersToDelete.addAll(existingAnswers);
+
         switch (question.type) {
           case 'T' || 'S' || 'N': // Número ou Texto
             final textValue = question.textController?.text;
             if (textValue != null && textValue.isNotEmpty) {
-              final existingAnswer = await isar!.answers
+              final existingAnswer = await database.isar.answers
                   .filter()
                   .responseIdEqualTo(responseId)
                   .and()
@@ -136,6 +162,7 @@ class FormController {
               if (existingAnswer != null) {
                 existingAnswer.value = textValue;
                 answersToUpdate.add(existingAnswer);
+                answersToDelete.remove(existingAnswer);
               } else {
                 answersToSave.add(
                   Answer(
@@ -149,10 +176,10 @@ class FormController {
               }
             }
             break;
-          case 'M': // Múltipla escolha (checkbox)
+          case 'M': // Múltipla escolha
             for (final subQuestion in question.subQuestions) {
               if (subQuestion.isSelected) {
-                final existingAnswer = await isar!.answers
+                final existingAnswer = await database.isar.answers
                     .filter()
                     .responseIdEqualTo(responseId)
                     .and()
@@ -163,7 +190,9 @@ class FormController {
 
                 if (existingAnswer != null) {
                   existingAnswer.value = subQuestion.title;
+                  existingAnswer.other = '';
                   answersToUpdate.add(existingAnswer);
+                  answersToDelete.remove(existingAnswer);
                 } else {
                   answersToSave.add(
                     Answer(
@@ -177,11 +206,39 @@ class FormController {
                 }
               }
             }
+
+            if (question.other == 'Y' && question.otherValue != null && question.otherValue!.isNotEmpty) {
+              final existingOtherAnswer = await database.isar.answers
+                  .filter()
+                  .responseIdEqualTo(responseId)
+                  .and()
+                  .questionIdEqualTo(question.questionId)
+                  .and()
+                  .valueEqualTo('other')
+                  .findFirst();
+
+              if (existingOtherAnswer != null) {
+                existingOtherAnswer.value = 'other';
+                existingOtherAnswer.other = question.otherValue!;
+                answersToUpdate.add(existingOtherAnswer);
+                answersToDelete.remove(existingOtherAnswer);
+              } else {
+                answersToSave.add(
+                  Answer(
+                    id: Isar.autoIncrement,
+                    responseId: responseId,
+                    questionId: question.questionId,
+                    value: 'other',
+                    other: question.otherValue!,
+                  ),
+                );
+              }
+            }
             break;
-          case 'L': // Rádio (listradio)
+          case 'L': // Rádio
             final selectedAnswer = question.selectedRadioOption;
             if (selectedAnswer != null && selectedAnswer.isNotEmpty) {
-              final existingAnswer = await isar!.answers
+              final existingAnswer = await database.isar.answers
                   .filter()
                   .responseIdEqualTo(responseId)
                   .and()
@@ -192,7 +249,9 @@ class FormController {
 
               if (existingAnswer != null) {
                 existingAnswer.value = selectedAnswer;
+                existingAnswer.other = selectedAnswer == 'other' ? question.otherValue ?? '' : '';
                 answersToUpdate.add(existingAnswer);
+                answersToDelete.remove(existingAnswer);
               } else {
                 answersToSave.add(
                   Answer(
@@ -200,7 +259,7 @@ class FormController {
                     responseId: responseId,
                     questionId: question.questionId,
                     value: selectedAnswer,
-                    other: '',
+                    other: selectedAnswer == 'other' ? question.otherValue ?? '' : '',
                   ),
                 );
               }
@@ -210,7 +269,7 @@ class FormController {
             if (question.imagePaths.isNotEmpty) {
               for (final imagePath in question.imagePaths) {
                 if (imagePath != null && imagePath.isNotEmpty) {
-                  final existingAnswer = await isar!.answers
+                  final existingAnswer = await database.isar.answers
                       .filter()
                       .responseIdEqualTo(responseId)
                       .and()
@@ -220,6 +279,7 @@ class FormController {
                   if (existingAnswer != null) {
                     existingAnswer.value = imagePath;
                     answersToUpdate.add(existingAnswer);
+                    answersToDelete.remove(existingAnswer);
                   } else {
                     answersToSave.add(
                       Answer(
@@ -227,7 +287,6 @@ class FormController {
                         responseId: responseId,
                         questionId: question.questionId,
                         value: imagePath,
-                        other: '',
                       ),
                     );
                   }
@@ -239,11 +298,29 @@ class FormController {
       }
     }
 
+    // set the needSync flag to true
+    final response = await database.isar.responses.get(responseId);
+    if (response != null) {
+      await database.isar.writeTxn(() async {
+        response.needSync = true;
+        await database.isar.responses.put(response);
+      });
+    }
+
+    // Deletar as respostas que não estão mais presentes
+    for (final answer in answersToDelete) {
+      await database.isar.writeTxn(() async {
+        await database.isar.answers.delete(answer.id);
+      });
+    }
+
     // Salvar as respostas no banco de dados
-    await isar!.writeTxn(() async {
-      await isar.answers.putAll(answersToSave);
-      await isar.answers.putAll(answersToUpdate);
+    await database.isar.writeTxn(() async {
+      await database.isar.answers.putAll(answersToSave);
+      await database.isar.answers.putAll(answersToUpdate);
     });
+
+    completer.complete(true);
   }
 
   Future<List<Answer>> loadAnswers(int responseId) async {
@@ -259,7 +336,6 @@ class FormController {
       final question = questions.firstWhere((q) => q.questionId == answer.questionId);
       switch (question.type) {
         case 'T' || 'S' || 'N': // Número ou Texto
-          // question.textController = TextEditingController(text: answer.value);
           question.textController?.text = answer.value;
           break;
         case 'M':
@@ -268,9 +344,14 @@ class FormController {
               subQuestion.isSelected = true;
             }
           }
+          if (answer.value == 'other') {
+            question.otherValue = answer.other;
+            question.textController?.text = answer.other!;
+          }
           break;
         case 'L':
           question.selectedRadioOption = answer.value;
+          question.otherValue = answer.other;
           break;
         case '|':
           question.imagePaths.add(answer.value);
@@ -399,6 +480,7 @@ class FormQuestion {
   final String themeName;
   final bool mandatory;
   final int order;
+  String other;
   String? maxNumOfFiles;
   TextEditingController? textController;
   String? selectedRadioOption;
@@ -407,6 +489,31 @@ class FormQuestion {
   List<SubQuestion> subQuestions;
   List<AvailableAnswer> availableAnswers;
   List<AnswerOption> answerOptions;
+  String? otherValue;
+
+  bool validate() {
+    if (mandatory) {
+      switch (type) {
+        case 'T' || 'S' || 'N':
+          return textController?.text.isNotEmpty ?? false;
+        case 'M':
+          if (subQuestions.any((sq) => sq.isSelected)) {
+            return true;
+          }
+          if (other == 'Y' && otherValue != null && otherValue!.isNotEmpty) {
+            return true;
+          }
+          return false;
+        case 'L':
+          return selectedRadioOption != null && selectedRadioOption!.isNotEmpty;
+        case '|':
+          return imagePaths.isNotEmpty;
+        default:
+          return false;
+      }
+    }
+    return true;
+  }
 
   FormQuestion({
     required this.questionId,
@@ -416,6 +523,8 @@ class FormQuestion {
     required this.themeName,
     required this.mandatory,
     required this.order,
+    required this.other,
+    this.otherValue,
     this.maxNumOfFiles,
     required this.subQuestions,
     required this.answerOptions,
@@ -435,6 +544,7 @@ class FormQuestion {
       themeName: json['themeName'] as String? ?? '',
       mandatory: json['mandatory'] as bool? ?? false,
       order: json['order'] as int? ?? 0,
+      other: json['other'] as String? ?? '',
       maxNumOfFiles: json['maxNumOfFiles'] as String?,
       subQuestions: (json['subQuestions'] as List<dynamic>?)
               ?.map((item) => SubQuestion.fromJson(item as Map<String, dynamic>))

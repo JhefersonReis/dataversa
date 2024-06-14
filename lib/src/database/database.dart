@@ -8,10 +8,17 @@ import 'package:isar/isar.dart';
 import 'package:path_provider/path_provider.dart';
 
 class Database {
+  static Isar? _isarInstance;
+
   Future<void> initializeDatabase() async {
-    // Initialize database
+    // Verifica se a instância já está aberta
+    if (_isarInstance != null && _isarInstance!.isOpen) {
+      return;
+    }
+
+    // Inicializa o banco de dados
     final dir = await getApplicationDocumentsDirectory();
-    await Isar.open([
+    _isarInstance = await Isar.open([
       SessionKeySchema,
       SurveySchema,
       QuestionSchema,
@@ -20,4 +27,6 @@ class Database {
       ResponseSchema,
     ], directory: dir.path);
   }
+
+  Isar get isar => _isarInstance!;
 }

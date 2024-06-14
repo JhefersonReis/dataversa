@@ -18,115 +18,118 @@ class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final sincronizar = GetIt.I.get<SyncFromServer>();
   final surveyController = GetIt.I.get<SurveyController>();
+  final authController = GetIt.I.get<AuthController>();
 
   @override
   void initState() {
     super.initState();
     sincronizar.syncData();
-    // surveyController.getSurveys();
-    // readSharedPrefs();
+    authController.logged.listen(context, _handleLogoutSignal);
+  }
+
+  void _handleLogoutSignal() {
+    if (!authController.logged.value) {
+      context.go('/auth');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      key: _scaffoldKey,
-      drawer: const DrawerTab(),
-      appBar: AppBar(
-        backgroundColor: Colors.grey[500],
-        leading: IconButton(
-          icon: const Icon(Icons.menu),
-          onPressed: () {
-            _scaffoldKey.currentState!.openDrawer();
-          },
-        ),
-        title: const Text(
-          'Pesquisas',
-          style: TextStyle(color: Colors.white),
-        ),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          Stack(
-            children: [
-              Watch(
-                (context) => sincronizar.loading.value ? const LinearProgressIndicator() : const SizedBox.shrink(),
-              ),
-              // ElevatedButton(
-              //   onPressed: () {
-              //     // surveyController.getSurveys();
-              //   },
-              //   child: const Text('Listar'),
-              // ),
-              // ElevatedButton(
-              //   onPressed: () {
-              //     sincronizar.syncData();
-              //   },
-              //   child: const Text('Popular banco de dados'),
-              // ),
-              Watch(
-                (context) => ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: surveyController.surveys.length,
-                  itemBuilder: (context, index) {
-                    final survey = surveyController.surveys[index];
-                    return Card(
-                      child: ListTile(
-                        onTap: () {
-                          // Get.toNamed('/responses', arguments: survey.sid);
-                          context.push('/responses', extra: survey.sid);
-                        },
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.all(
-                            Radius.circular(10),
-                          ),
-                        ),
-                        tileColor: Colors.grey[350],
-                        title: Text(survey.surveylsTitle),
-                        subtitle: Text(survey.sid.toString()),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                      ),
-                    );
-                  },
-                ),
-              )
-              // Obx(() {
-              //   if (surveyController.surveys.isEmpty) {
-              //     return const Center(
-              //       child: CircularProgressIndicator(),
-              //     );
-              //   }
-
-              //   return ListView.builder(
-              //     shrinkWrap: true,
-              //     itemCount: surveyController.surveys.length,
-              //     itemBuilder: (context, index) {
-              //       final survey = surveyController.surveys[index];
-              //       return Card(
-              //         child: ListTile(
-              //           onTap: () {
-              //             Get.toNamed('/responses', arguments: survey.sid);
-              //           },
-              //           shape: const RoundedRectangleBorder(
-              //             borderRadius: BorderRadius.all(
-              //               Radius.circular(10),
-              //             ),
-              //           ),
-              //           tileColor: Colors.grey[350],
-              //           title: Text(survey.surveylsTitle),
-              //           subtitle: Text(survey.sid.toString()),
-              //           trailing: const Icon(Icons.arrow_forward_ios),
-              //         ),
-              //       );
-              //     },
-              //   );
-              // })
-            ],
+        key: _scaffoldKey,
+        drawer: const DrawerTab(),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.menu),
+            onPressed: () {
+              _scaffoldKey.currentState!.openDrawer();
+            },
           ),
-        ],
-      ),
-    );
+          title: const Text(
+            'Pesquisas',
+            style: TextStyle(color: Colors.black),
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              onPressed: () {
+                sincronizar.syncData();
+              },
+            ),
+          ],
+        ),
+        body: Watch.builder(
+          builder: (context) {
+            if (sincronizar.loading.value) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            return ListView.builder(
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(8),
+              itemCount: surveyController.surveys.length,
+              itemBuilder: (context, index) {
+                final survey = surveyController.surveys[index];
+                return Card(
+                  child: ListTile(
+                    onTap: () {
+                      context.push('/responses', extra: survey.sid);
+                    },
+                    shape: const RoundedRectangleBorder(
+                      borderRadius: BorderRadius.all(
+                        Radius.circular(10),
+                      ),
+                    ),
+                    title: Text(survey.surveylsTitle),
+                    subtitle: Text(survey.sid.toString()),
+                    trailing: const Icon(Icons.arrow_forward_ios),
+                  ),
+                );
+              },
+            );
+          },
+        )
+        // body: Column(
+        //   mainAxisAlignment: MainAxisAlignment.center,
+        //   children: [
+        //     Stack(
+        //       children: [
+        //         // Center(
+        //         //   child: Watch(
+        //         //     (context) => sincronizar.loading.value ? const CircularProgressIndicator() : const SizedBox.shrink(),
+        //         //   ),
+        //         // ),
+        //         // Watch(
+        //         //   (context) => ListView.builder(
+        //         //     shrinkWrap: true,
+        //         //     padding: const EdgeInsets.all(8),
+        //         //     itemCount: surveyController.surveys.length,
+        //         //     itemBuilder: (context, index) {
+        //         //       final survey = surveyController.surveys[index];
+        //         //       return Card(
+        //         //         child: ListTile(
+        //         //           onTap: () {
+        //         //             context.push('/responses', extra: survey.sid);
+        //         //           },
+        //         //           shape: const RoundedRectangleBorder(
+        //         //             borderRadius: BorderRadius.all(
+        //         //               Radius.circular(10),
+        //         //             ),
+        //         //           ),
+        //         //           style: ListTileStyle.list,
+        //         //           title: Text(survey.surveylsTitle),
+        //         //           subtitle: Text(survey.sid.toString()),
+        //         //           trailing: const Icon(Icons.arrow_forward_ios),
+        //         //         ),
+        //         //       );
+        //         //     },
+        //         //   ),
+        //         // )
+        //       ],
+        //     ),
+        //   ],
+        // ),
+        );
   }
 }
 
@@ -138,54 +141,39 @@ class DrawerTab extends StatelessWidget {
     return Drawer(
       child: ListView(
         children: [
-          // const DrawerHeader(
-          //   decoration: BoxDecoration(
-          //     color: Colors.blue,
-          //   ),
-          //   child: Text(
-          //     'DataVersa',
-          //     style: TextStyle(
-          //       color: Colors.white,
-          //       fontSize: 24,
-          //     ),
-          //   ),
-          // ),
+          DrawerHeader(
+            padding: const EdgeInsets.all(16.0),
+            child: Image.asset(
+              'assets/logo_dataversa.png',
+              // height: 12.0,
+            ),
+          ),
           ListTile(
             title: const Text('Pesquisas'),
+            trailing: const Icon(Icons.article),
             onTap: () {
-              Navigator.pop(context);
+              context.go('/home');
+              context.pop();
             },
           ),
           ListTile(
-            tileColor: Colors.green,
-            title: const Text('Criar database'),
+            title: const Text('Upload de Dados'),
+            trailing: const Icon(Icons.upload),
             onTap: () {
-              // getDatabase();
+              context.push('/upload');
+              context.pop();
             },
           ),
           ListTile(
-            tileColor: Colors.red,
-            title: const Text('Deletar database'),
+            title: const Text('Sair'),
+            trailing: const Icon(Icons.exit_to_app, color: Colors.red),
             onTap: () {
-              // deleteDatabaseFunction();
-            },
-          ),
-          ListTile(
-            title: const Text('Logout'),
-            onTap: () {
-              // final Future<SharedPreferences> prefs =
-              //     SharedPreferences.getInstance();
-              // await prefs.then((SharedPreferences prefs) {
-              //   prefs.clear();
-              // });
-              // Get.offNamed('/login');
               final isar = Isar.getInstance();
               final authController = GetIt.I.get<AuthController>();
-              final surveyController = GetIt.I.get<SurveyController>();
               isar!.writeTxn(() => isar.clear());
-              context.go('/auth');
               authController.logged.set(false);
-              surveyController.resetSurveys();
+              // final surveyController = GetIt.I.get<SurveyController>();
+              // surveyController.resetSurveys();
             },
           ),
         ],

@@ -13,17 +13,34 @@ class QuestionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    switch (question.type) {
-      case 'M': // Multiple choice
-        return MultipleChoiceQuestionWidget(question: question);
-      case 'T' || 'S' || 'N': // Text question
-        return TextQuestionWidget(question: question);
-      case 'L': // Radio button question
-        return RadioQuestionWidget(question: question);
-      case '|': // Photo question
-        return PhotoQuestionWidget(question: question);
-      default:
-        return const Text('Unknown question type');
+    if (question.title == 'GEOLOCALIZACAO' || question.title == 'USUARIO') {
+      return const SizedBox.shrink();
     }
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color.fromARGB(255, 242, 240, 240),
+        border: Border.all(
+          color: Colors.black,
+          width: 1,
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      padding: const EdgeInsets.all(12.0),
+      margin: const EdgeInsets.only(bottom: 12.0),
+      child: () {
+        switch (question.type) {
+          case 'T' || 'S' || 'N':
+            return TextQuestionWidget(question: question);
+          case 'L':
+            return RadioQuestionWidget(question: question);
+          case 'M':
+            return MultipleChoiceQuestionWidget(question: question);
+          case '|':
+            return PhotoQuestionWidget(question: question);
+          default:
+            return const SizedBox.shrink();
+        }
+      }(),
+    );
   }
 }

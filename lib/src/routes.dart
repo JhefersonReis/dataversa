@@ -3,6 +3,7 @@ import 'package:dataversa/src/screens/form_screen.dart';
 import 'package:dataversa/src/screens/home_screen.dart';
 import 'package:dataversa/src/screens/responses_screen.dart';
 import 'package:dataversa/src/screens/splash_screen.dart';
+import 'package:dataversa/src/screens/upload_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,6 +23,10 @@ final GoRouter router = GoRouter(
       builder: (context, state) => const HomeScreen(),
     ),
     GoRoute(
+      path: '/upload',
+      builder: (context, state) => const UploadScreen(),
+    ),
+    GoRoute(
       path: '/responses',
       builder: (context, state) => const ResponsesScreen(),
     ),
@@ -38,10 +43,6 @@ final GoRouter router = GoRouter(
           ),
         );
       },
-      // builder: (context, state) => const FormScreen(
-      //   responseId: 1,
-      //   surveyId: 1111111,
-      // ),
     ),
   ],
 );

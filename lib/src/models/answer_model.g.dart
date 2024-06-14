@@ -58,7 +58,12 @@ int _answerEstimateSize(
   Map<Type, List<int>> allOffsets,
 ) {
   var bytesCount = offsets.last;
-  bytesCount += 3 + object.other.length * 3;
+  {
+    final value = object.other;
+    if (value != null) {
+      bytesCount += 3 + value.length * 3;
+    }
+  }
   bytesCount += 3 + object.value.length * 3;
   return bytesCount;
 }
@@ -83,7 +88,7 @@ Answer _answerDeserialize(
 ) {
   final object = Answer(
     id: id,
-    other: reader.readString(offsets[0]),
+    other: reader.readStringOrNull(offsets[0]),
     questionId: reader.readLong(offsets[1]),
     responseId: reader.readLong(offsets[2]),
     value: reader.readString(offsets[3]),
@@ -99,7 +104,7 @@ P _answerDeserializeProp<P>(
 ) {
   switch (propertyId) {
     case 0:
-      return (reader.readString(offset)) as P;
+      return (reader.readStringOrNull(offset)) as P;
     case 1:
       return (reader.readLong(offset)) as P;
     case 2:
@@ -251,8 +256,24 @@ extension AnswerQueryFilter on QueryBuilder<Answer, Answer, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Answer, Answer, QAfterFilterCondition> otherIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNull(
+        property: r'other',
+      ));
+    });
+  }
+
+  QueryBuilder<Answer, Answer, QAfterFilterCondition> otherIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(const FilterCondition.isNotNull(
+        property: r'other',
+      ));
+    });
+  }
+
   QueryBuilder<Answer, Answer, QAfterFilterCondition> otherEqualTo(
-    String value, {
+    String? value, {
     bool caseSensitive = true,
   }) {
     return QueryBuilder.apply(this, (query) {
@@ -265,7 +286,7 @@ extension AnswerQueryFilter on QueryBuilder<Answer, Answer, QFilterCondition> {
   }
 
   QueryBuilder<Answer, Answer, QAfterFilterCondition> otherGreaterThan(
-    String value, {
+    String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -280,7 +301,7 @@ extension AnswerQueryFilter on QueryBuilder<Answer, Answer, QFilterCondition> {
   }
 
   QueryBuilder<Answer, Answer, QAfterFilterCondition> otherLessThan(
-    String value, {
+    String? value, {
     bool include = false,
     bool caseSensitive = true,
   }) {
@@ -295,8 +316,8 @@ extension AnswerQueryFilter on QueryBuilder<Answer, Answer, QFilterCondition> {
   }
 
   QueryBuilder<Answer, Answer, QAfterFilterCondition> otherBetween(
-    String lower,
-    String upper, {
+    String? lower,
+    String? upper, {
     bool includeLower = true,
     bool includeUpper = true,
     bool caseSensitive = true,
@@ -769,7 +790,7 @@ extension AnswerQueryProperty on QueryBuilder<Answer, Answer, QQueryProperty> {
     });
   }
 
-  QueryBuilder<Answer, String, QQueryOperations> otherProperty() {
+  QueryBuilder<Answer, String?, QQueryOperations> otherProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'other');
     });
