@@ -11,10 +11,6 @@ class MyApp extends StatelessWidget {
     return ToastificationWrapper(
       child: MaterialApp.router(
         title: 'DataVersa',
-        // theme: ThemeData(
-        //   colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        //   useMaterial3: true,
-        // ),
         theme: AppTheme.themeData,
         routerConfig: router,
       ),

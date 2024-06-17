@@ -1,6 +1,10 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
+import 'package:native_device_orientation/native_device_orientation.dart';
 import 'dart:io';
 
 class CameraScreen extends StatefulWidget {
@@ -14,6 +18,7 @@ class _CameraScreenState extends State<CameraScreen> {
   CameraController? _cameraController;
   List<CameraDescription>? cameras;
   bool _isInitialized = false;
+  bool useSensor = false;
 
   @override
   void initState() {
@@ -30,13 +35,13 @@ class _CameraScreenState extends State<CameraScreen> {
         _isInitialized = true;
       });
     } catch (e) {
-      print(e);
+      log(e.toString());
     }
   }
 
   Future<void> takePicture(BuildContext context) async {
     if (!_cameraController!.value.isInitialized) {
-      print("Controller is not initialized");
+      log("Controller is not initialized");
       return;
     }
 
@@ -51,12 +56,39 @@ class _CameraScreenState extends State<CameraScreen> {
     }
 
     try {
+      final orientation = await NativeDeviceOrientationCommunicator().orientation(useSensor: true);
+
       XFile picture = await _cameraController!.takePicture();
-      await picture.saveTo(filePath);
+      await saveImageWithCorrectOrientation(picture, filePath, orientation);
       Navigator.pop(context, filePath);
     } catch (e) {
-      print(e);
+      log(e.toString());
     }
+  }
+
+  Future<void> saveImageWithCorrectOrientation(
+      XFile picture, String filePath, NativeDeviceOrientation orientation) async {
+    final img.Image capturedImage = img.decodeImage(await picture.readAsBytes())!;
+    img.Image orientedImage;
+
+    switch (orientation) {
+      case NativeDeviceOrientation.landscapeLeft:
+        orientedImage = img.copyRotate(capturedImage, angle: -90);
+        break;
+      case NativeDeviceOrientation.landscapeRight:
+        orientedImage = img.copyRotate(capturedImage, angle: 90);
+        break;
+      case NativeDeviceOrientation.portraitDown:
+        orientedImage = img.copyRotate(capturedImage, angle: 180);
+        break;
+      case NativeDeviceOrientation.portraitUp:
+      default:
+        orientedImage = capturedImage;
+        break;
+    }
+
+    final File imageFile = File(filePath);
+    await imageFile.writeAsBytes(img.encodePng(orientedImage));
   }
 
   @override
@@ -65,24 +97,80 @@ class _CameraScreenState extends State<CameraScreen> {
     super.dispose();
   }
 
+  Widget buildCameraPreviewLandscape() {
+    return Stack(
+      children: [
+        Center(
+          child: SizedBox(
+            width: _cameraController!.value.previewSize!.width,
+            height: _cameraController!.value.previewSize!.height,
+            child: CameraPreview(
+              _cameraController!,
+            ),
+          ),
+        ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () => takePicture(context),
+              child: const Text('Take a photo'),
+            ),
+          ],
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: ElevatedButton(
+              onPressed: () => takePicture(context),
+              child: const Text('Take a photo'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget buildCameraPreviewPortrait() {
+    return Stack(
+      children: [
+        Center(
+          child: SizedBox(
+            width: _cameraController!.value.previewSize!.height,
+            height: _cameraController!.value.previewSize!.width,
+            child: CameraPreview(
+              _cameraController!,
+            ),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: ElevatedButton(
+              onPressed: () => takePicture(context),
+              child: const Text('Tirar foto'),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: _isInitialized
-          ? Stack(
-              children: [
-                CameraPreview(_cameraController!),
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.all(20.0),
-                    child: ElevatedButton(
-                      onPressed: () => takePicture(context),
-                      child: const Text('Take a photo'),
-                    ),
-                  ),
-                ),
-              ],
+          ? NativeDeviceOrientedWidget(
+              useSensor: useSensor,
+              portrait: (context) => buildCameraPreviewPortrait(),
+              landscape: (context) => buildCameraPreviewLandscape(),
+              landscapeLeft: (p0) => buildCameraPreviewLandscape(),
+              landscapeRight: (p0) => buildCameraPreviewLandscape(),
+              portraitDown: (p0) => buildCameraPreviewPortrait(),
+              portraitUp: (p0) => buildCameraPreviewPortrait(),
+              fallback: (context) => const Center(child: CircularProgressIndicator()),
             )
           : const Center(child: CircularProgressIndicator()),
     );

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer';
 
 import 'package:dataversa/src/database/database.dart';
 import 'package:dataversa/src/helpers/helpers.dart';
@@ -274,6 +275,8 @@ class FormController {
                       .responseIdEqualTo(responseId)
                       .and()
                       .questionIdEqualTo(question.questionId)
+                      .and()
+                      .valueEqualTo(imagePath)
                       .findFirst();
 
                   if (existingAnswer != null) {
@@ -321,11 +324,6 @@ class FormController {
     });
 
     completer.complete(true);
-  }
-
-  Future<List<Answer>> loadAnswers(int responseId) async {
-    final isar = Isar.getInstance();
-    return await isar!.answers.filter().responseIdEqualTo(responseId).findAll();
   }
 
   Future<void> loadFormData(int responseId, List<FormQuestion> questions) async {

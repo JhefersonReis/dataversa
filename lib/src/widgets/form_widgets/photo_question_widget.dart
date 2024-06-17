@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:dataversa/src/controllers/form_controller.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
@@ -50,20 +52,60 @@ class _PhotoQuestionWidgetState extends State<PhotoQuestionWidget> {
         ),
         ElevatedButton(
           onPressed: () => _navigateAndCapturePhoto(context),
-          child: const Text('Take a photo'),
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 40),
+          ),
+          child: const Text('Tirar foto'),
         ),
-        Row(
-          children: [
-            for (final imagePath in widget.question.imagePaths)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Image.file(
-                  File(imagePath!),
-                  width: 100,
-                  height: 100,
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final imagePath in widget.question.imagePaths)
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) {
+                        return AlertDialog(
+                          title: const Text('Deletar a seguinte foto?'),
+                          content: Image.file(
+                            File(imagePath),
+                            width: 320,
+                            height: 320,
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                              },
+                              child: const Text('Cancelar'),
+                            ),
+                            TextButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                setState(() {
+                                  widget.question.imagePaths.remove(imagePath);
+                                });
+                              },
+                              child: const Text('Deletar'),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: Image.file(
+                      File(imagePath!),
+                      width: 100,
+                      height: 100,
+                    ),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         )
       ],
     );
